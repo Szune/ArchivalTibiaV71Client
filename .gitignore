@@ -1,0 +1,5 @@
+sdl2/
+zig-cache/
+zig-out/
+*.spr
+build.lb

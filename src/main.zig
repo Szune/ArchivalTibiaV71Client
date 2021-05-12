@@ -25,7 +25,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 const game_width = 800;
 const game_height = 640;
-const sprite_size = 32;
+const sprite_size: u16 = 32;
 
 const Mask = struct {
     r: u32,
@@ -198,6 +198,7 @@ pub fn createSpriteTextures(renderer: *c.SDL_Renderer, sprites: []SpriteData) ![
             c.SDL_Log("Unable to create surface: %s", c.SDL_GetError());
             return error.SDLInitializationFailed;
         };
+        defer c.SDL_FreeSurface(surface);
 
         // set transparent color
         var trsp: u32 = @as(u32, val.transparent) | (255 << 24);
@@ -225,7 +226,6 @@ pub fn createSpriteTextures(renderer: *c.SDL_Renderer, sprites: []SpriteData) ![
             c.SDL_Log("Unable to create texture: %s", c.SDL_GetError());
             return error.SDLInitializationFailed;
         };
-        c.SDL_FreeSurface(surface);
 
         textures[idx] = texture;
     }
@@ -240,6 +240,29 @@ pub fn freeSpriteTextures(sprites: []SDL_Texture) !void {
     }
     gpa.allocator.free(sprites);
 }
+
+const map_y: u16 = 16;
+const map_x: u16 = 16;
+
+fn init_map() [map_y][map_x]u16 {
+    comptime {
+        var map: [map_y][map_x]u16 = undefined;
+        var i: u16 = 196;
+        {
+            var y = 0;
+            while (y < map_y) : (y += 1) {
+                var x = 0;
+                while (x < map_x) : (x += 1) {
+                    map[y][x] = i;
+                    i += 1;
+                }
+            }
+        }
+        return map;
+    }
+}
+
+const basic_map: [map_y][map_x]u16 = init_map();
 
 pub fn main() anyerror!void {
     defer _ = gpa.deinit();
@@ -257,7 +280,7 @@ pub fn main() anyerror!void {
     };
     defer c.SDL_DestroyWindow(window);
 
-    const renderer = c.SDL_CreateRenderer(window, 0, c.SDL_RENDERER_PRESENTVSYNC) orelse {
+    const renderer = c.SDL_CreateRenderer(window, -1, c.SDL_RENDERER_PRESENTVSYNC | c.SDL_RENDERER_ACCELERATED) orelse {
         c.SDL_Log("Unable to create renderer: %s", c.SDL_GetError());
         return error.SDLInitializationFailed;
     };
@@ -275,6 +298,7 @@ pub fn main() anyerror!void {
     };
 
     var frame: usize = 0;
+    var rotating = false;
 
     drawLoop: while (true) {
         var event: c.SDL_Event = undefined;
@@ -284,20 +308,27 @@ pub fn main() anyerror!void {
                 c.SDL_KEYDOWN => {
                     switch (event.key.keysym.sym) {
                         c.SDLK_ESCAPE, c.SDLK_q => break :drawLoop,
+                        c.SDLK_r => rotating = !rotating,
                         else => {},
                     }
                 },
                 else => {},
             }
-
-            _ = c.SDL_RenderClear(renderer);
-            _ = c.SDL_SetRenderDrawColor(renderer, 0x22, 0x22, 0x22, 0x22);
-            var rect = c.SDL_Rect{ .x = 0, .y = 0, .w = game_width, .h = game_height };
-            _ = c.SDL_RenderFillRect(renderer, &rect);
-            _ = c.SDL_RenderCopy(renderer, sprites[196], 0, &c.SDL_Rect{ .x = 0, .y = 0, .w = sprite_size, .h = sprite_size });
-            _ = c.SDL_RenderCopy(renderer, sprites[197], 0, &c.SDL_Rect{ .x = sprite_size, .y = 0, .w = sprite_size, .h = sprite_size });
-            c.SDL_RenderPresent(renderer);
-            c.SDL_Delay(10);
         }
+
+        _ = c.SDL_RenderClear(renderer);
+        _ = c.SDL_SetRenderDrawColor(renderer, 0x22, 0x22, 0x22, 0x22);
+        var rect = c.SDL_Rect{ .x = 0, .y = 0, .w = game_width, .h = game_height };
+        _ = c.SDL_RenderFillRect(renderer, &rect);
+        for (basic_map) |sprite_row, y| {
+            for (sprite_row) |sprite, x| {
+                _ = c.SDL_RenderCopy(renderer, sprites[sprite + (frame % 100)], 0, &c.SDL_Rect{ .x = @truncate(u16, x) * sprite_size, .y = @truncate(u16, y) * sprite_size, .w = sprite_size, .h = sprite_size });
+            }
+        }
+        c.SDL_RenderPresent(renderer);
+        if (rotating) {
+            frame += 1;
+        }
+        c.SDL_Delay(17);
     }
 }

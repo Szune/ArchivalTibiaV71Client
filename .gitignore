@@ -2,4 +2,5 @@ sdl2/
 zig-cache/
 zig-out/
 *.spr
+*.pic
 build.lb

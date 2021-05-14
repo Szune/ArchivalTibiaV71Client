@@ -29,6 +29,18 @@ pub const BufferedReader = struct {
 
     const Self = @This();
 
+    pub fn init(file: *const std.fs.File) Self {
+        return Self{
+            .available = 0,
+            .buffer_pos = 0,
+            .stream_offset = 0,
+            .stream = file,
+            .buffer = undefined,
+            .eof = false,
+            .err = null,
+        };
+    }
+
     fn readMore(self: *Self) BRError!void {
         self.stream_offset += self.buffer_pos;
         self.available = try self.stream.pread(&self.buffer, self.stream_offset);
